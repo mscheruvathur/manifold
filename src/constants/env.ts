@@ -45,6 +45,11 @@ const env = cleanEnv(
 
         CORS_ORIGINS: validateCORSOrigins(),
         LOG_QUERY: bool(),
+
+        // JWT Config
+        JWT_AUDIENCE: str(),
+        JWT_ISSUER: str(),
+        JWT_INTERNAL_USER_AUDIENCE: str(),
     },
     {}
 );
