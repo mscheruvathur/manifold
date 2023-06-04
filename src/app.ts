@@ -1,11 +1,65 @@
-import express from 'express';
-const app = express();
-const port = 3000;
+import logger from "./lib/logging";
+import { config } from "dotenv";
 
-app.get('/', (req, res) => {
-  res.send('Hello World!');
-});
+config();
 
-app.listen(port, () => {
-  return console.log(`Express is listening at http://localhost:${port}`);
-});
+import env from "./constants/env";
+import { connectDB } from "./lib/db";
+import createServer from "./utils/server";
+import cluster from 'cluster';
+import os from 'os';
+
+const PORT = env.PORT;
+
+async function main() {
+
+  connectDB()
+
+  if (env.isDev) {
+
+    const { app } = await createServer();
+
+    app.listen(PORT, async () => {
+      logger.info(`🚀 Server ready at http://localhost:${PORT}`);
+    })
+
+    process.on('uncaughtException', async (e) => {
+      logger.error(JSON.stringify(e));
+      setTimeout(() => {
+        process.exit(1);
+      }, 600);
+    });
+
+  } else {
+    if (cluster.isPrimary) {
+      const totalCPUs = os.cpus().length;
+
+      for (let cpu = 0; cpu < totalCPUs; cpu++) {
+        cluster.fork();
+      }
+
+      cluster.on('exit', (worker, code, signal) => {
+        logger.error(JSON.stringify(`${code} - ${signal}`));
+        setTimeout(() => {
+          process.exit(1);
+        }, 600);
+      });
+    } else {
+      const { app } = await createServer();
+
+            app.listen(PORT, async () => {
+                logger.info(`🚀 Server ready at http://localhost:${PORT}`);
+            });
+
+            process.on('uncaughtException', async (e) => {
+                logger.error(JSON.stringify(e));
+                setTimeout(() => {
+                    process.exit(1);
+                }, 600);
+            });
+    }
+  }
+
+}
+
+main();
