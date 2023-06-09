@@ -1,5 +1,6 @@
 import logger from "./lib/logging";
 import { config } from "dotenv";
+import { loadKeys } from "./utils/jwt";
 
 config();
 
@@ -17,6 +18,7 @@ async function main() {
 
   if (env.isDev) {
 
+    await loadKeys()
     const { app } = await createServer();
 
     app.listen(PORT, async () => {
@@ -45,6 +47,7 @@ async function main() {
         }, 600);
       });
     } else {
+      await loadKeys()
       const { app } = await createServer();
 
             app.listen(PORT, async () => {

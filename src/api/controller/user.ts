@@ -5,6 +5,9 @@ import { APIError } from "../../exceptions";
 import { Request, Response } from "express";
 import HttpStatusCode from "../shared/status";
 import { Prisma } from "@prisma/client";
+import { v4 as uuidv4 } from 'uuid';
+import { IAccessTokenPayload, IRefreshTokenPayload } from "../../interfaces";
+import { createAccessToken, createRefreshToken } from "../../utils/jwt";
 
 export class UserController {
     static async register(req: Request, res: Response) {
@@ -61,28 +64,71 @@ export class UserController {
         try {
             const { email, password } = req.body
 
-            const doesExist = await prisma.user.findUnique({
+            const existUser = await prisma.user.findUnique({
                 where: {
                     email: email
                 },
                 select: {
                     id: true,
                     password: true,
-                    email: true
+                    email: true,
+                    name: true,
+                    userType: true
                 }
             });
 
-            if (!doesExist) {
+            if (!existUser) {
                 throw APIError.NotFound('User with this email was not found')
             }
 
-            if (await argon2.verify(doesExist.password, password)) {
+            if (await argon2.verify(existUser.password, password)) {
+
+                const refreshTokenKey = uuidv4();
+                const accessTokenKey = uuidv4();
+
+                const accessTokenPayload: IAccessTokenPayload = {
+                    name: existUser.name,
+                    email: existUser.email,
+                    utk: accessTokenKey,
+                    uuid: existUser.id,
+                    userType: existUser.userType
+                };
+
+                const refreshTokenPayload: IRefreshTokenPayload = {
+                    key: refreshTokenKey
+                };
+
+                const accessToken = await createAccessToken(accessTokenPayload);
+                const refreshToken = await createRefreshToken(refreshTokenPayload);
+
+                if (!accessToken || !refreshToken) {
+                    throw APIError.Unauthorized()
+                }
+
+                await prisma.userSession.create({
+                    data: {
+                        accessToken: accessToken,
+                        refreshToken: refreshToken,
+                        refreshTokenKey: refreshTokenKey,
+                        isRevoked: false,
+                        location: "",
+                        latitude: 0.1,
+                        longitude: 0.1,
+                        ipAddress: "",
+                        user: {
+                            connect: {
+                                id: existUser.id
+                            }
+                        }
+                    }
+                })
+                
                 return sendResponse(res, 'success', {
                     status: HttpStatusCode.OK,
                     message: 'User logged in',
                     data: {
-                        accessToken: "Not implemented",
-                        refreshToken: "Not implemented",
+                        accessToken: accessToken,
+                        refreshToken: refreshToken,
                     }
                 })
             }
