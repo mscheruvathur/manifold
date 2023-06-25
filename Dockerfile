@@ -1,14 +1,16 @@
-FROM node:18-alpine
+FROM node:18.16.0-alpine
 
 WORKDIR /manifold
 
-COPY package*.json ./
-
-COPY . .
+COPY package*.json .
 
 RUN npm install -g ts-node
 
-RUN npm install 
+RUN npm install
+
+COPY . .
+
+RUN npx prisma generate
 
 RUN npm run build
 
